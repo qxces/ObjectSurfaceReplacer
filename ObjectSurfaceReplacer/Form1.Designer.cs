@@ -28,19 +28,8 @@
         /// </summary>
         private void InitializeComponent()
         {
-            this.ReplaceSurfaces_btn = new System.Windows.Forms.Button();
             this.test_btn = new System.Windows.Forms.Button();
             this.SuspendLayout();
-            // 
-            // ReplaceSurfaces_btn
-            // 
-            this.ReplaceSurfaces_btn.Location = new System.Drawing.Point(119, 237);
-            this.ReplaceSurfaces_btn.Name = "ReplaceSurfaces_btn";
-            this.ReplaceSurfaces_btn.Size = new System.Drawing.Size(75, 23);
-            this.ReplaceSurfaces_btn.TabIndex = 0;
-            this.ReplaceSurfaces_btn.Text = "Replace surfaces";
-            this.ReplaceSurfaces_btn.UseVisualStyleBackColor = true;
-            this.ReplaceSurfaces_btn.Click += new System.EventHandler(this.ReplaceSurfaces_btn_Click);
             // 
             // test_btn
             // 
@@ -58,7 +47,6 @@
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(800, 450);
             this.Controls.Add(this.test_btn);
-            this.Controls.Add(this.ReplaceSurfaces_btn);
             this.Name = "Form1";
             this.Text = "Form1";
             this.ResumeLayout(false);
@@ -66,8 +54,6 @@
         }
 
         #endregion
-
-        private System.Windows.Forms.Button ReplaceSurfaces_btn;
         private System.Windows.Forms.Button test_btn;
     }
 }
