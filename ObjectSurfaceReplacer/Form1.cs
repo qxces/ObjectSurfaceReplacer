@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -115,14 +114,18 @@ namespace ObjectSurfaceReplacer
             SHADERS_CHUNK_NAMES = 3
         }
 
-        private string[] searchTextureMaterial(string texture)
+        private string[] searchTextureMaterial(string texture, bool asFolder = false)
         {
             var material = File.ReadLines("materials.ini").Where(line => line.StartsWith(texture));
+            if (asFolder)
+                material = File.ReadLines("materials.ini").Where(line => line.StartsWith(texture.Split('\\')[0]));
+
             if (material.Count() > 0)
             {
                 string[] mat = material.First().Split('=');
                 string[] all = null;
                 string engine = null, compiler = null, game = null, twoSided = null;
+
                 if (mat.Count() < 2)
                     return null;
                 if (mat[1].Count() == 0)
@@ -150,13 +153,13 @@ namespace ObjectSurfaceReplacer
 
         public static byte[] ReplaceBytes(byte[] src, byte[] search, byte[] repl)
         {
-           /* StackFrame frame = new StackTrace(1, true).GetFrame(0);
+            /* StackFrame frame = new StackTrace(1, true).GetFrame(0);
 
-            // Получаем номер строки и имя файла
-            int lineNumber = frame.GetFileLineNumber();
-            string fileName = frame.GetFileName();
+             // Получаем номер строки и имя файла
+             int lineNumber = frame.GetFileLineNumber();
+             string fileName = frame.GetFileName();
 
-            Console.WriteLine("Method called from {0}, line {1}", fileName, lineNumber);*/
+             Console.WriteLine("Method called from {0}, line {1}", fileName, lineNumber);*/
 
             if (repl == null) return src;
             int index = FindBytes(src, search);
@@ -213,63 +216,6 @@ namespace ObjectSurfaceReplacer
             else
                 return;
             Reader(filePath);
-        }
-
-        private void FindChunk(string filePath)
-        {
-
-
-            int chunkIdToFind = 0x0907;
-
-            using (FileStream fileStream = new FileStream(filePath, FileMode.Open))
-            {
-                BinaryReader reader = new BinaryReader(fileStream);
-
-                //7777
-                Console.WriteLine("block " + BitConverter.ToString(reader.ReadBytes(4)));
-                // Console.WriteLine(reader.ReadUInt32());
-                reader.ReadBytes(4);
-
-                // Look for the chunk with the specified ID
-                while (fileStream.Position < fileStream.Length)
-                {
-                    int chunkId = reader.ReadInt32();
-                    int chunkSize = reader.ReadInt32();
-
-                    if (chunkId == chunkIdToFind)
-                    {
-                        // Found the chunk we're looking for!
-                        Console.WriteLine($"Found chunk {chunkId} (size {chunkSize} bytes)");
-
-                        // Seek to the start of the chunk data
-                        long chunkDataStart = fileStream.Position;
-                        fileStream.Seek(chunkDataStart, SeekOrigin.Begin);
-
-                        // Create a BinaryWriter to write new data to the file
-                        BinaryWriter writer = new BinaryWriter(fileStream);
-
-                        // Write new data to the file
-                        writer.Write(42);
-                        writer.Write(3.14f);
-                        writer.Write("hello world");
-
-                        // Calculate the new size of the chunk
-                        int newChunkSize = (int)(fileStream.Position - chunkDataStart);
-
-                        // Update the chunk size in the file
-                        fileStream.Seek(chunkDataStart - 4, SeekOrigin.Begin);
-                        writer.Write(newChunkSize);
-
-                        // Exit the loop, since we found the chunk we're looking for
-                        break;
-                    }
-                    else
-                    {
-                        // Not the chunk we're looking for; skip over it
-                        fileStream.Seek(chunkSize, SeekOrigin.Current);
-                    }
-                }
-            }
         }
 
         private void Reader(string filePath)
@@ -397,8 +343,14 @@ namespace ObjectSurfaceReplacer
 
                                 if (mats == null)
                                 {
-                                    newData();
-                                    continue;
+                                    //если конкретный материал не найден, берем папку
+                                    mats = searchTextureMaterial(Encoding.ASCII.GetString(m_path), true);
+
+                                    if (mats == null)
+                                    {
+                                        newData();
+                                        continue;
+                                    }
                                 }
                                 Console.WriteLine(@"m_engine '{0}' m_compiler '{1}' m_game '{2}' two sided '{3}'", mats[0], mats[1], mats[2], mats[3]);
                                 Console.WriteLine("mats :" + mats.Length);
@@ -428,19 +380,16 @@ namespace ObjectSurfaceReplacer
                                 newData();
                             }
 
-                           /* Console.WriteLine(("new surface data " + Encoding.ASCII.GetString(surfacesDataNew)));
-                            Console.WriteLine(("old surface data " + Encoding.ASCII.GetString(surfacesDataOld)));*/
+                            /* Console.WriteLine(("new surface data " + Encoding.ASCII.GetString(surfacesDataNew)));
+                             Console.WriteLine(("old surface data " + Encoding.ASCII.GetString(surfacesDataOld)));*/
 
 
                             //записываем новый размер чанка
-                            if (surfacesDataNew != null)
+                            if (surfacesDataNew != surfacesDataOld)
                             {
-                                long chunkEnd = fileStream.Position;
                                 writer.Seek(Convert.ToInt32(surfacesChunkStart - 4), SeekOrigin.Begin);
                                 writer.Write(surfacesDataNew.Length);
                                 Console.WriteLine("new surface chunk size " + surfacesDataNew.Length + " old " + surfacesDataOld.Length);
-                                fileStream.Position = chunkEnd;
-                                Console.WriteLine(fileStream.Position.ToString());
                             }
                             break;
                         case (int)Object.EOBJ_CHUNK_REVISION:
@@ -486,14 +435,11 @@ namespace ObjectSurfaceReplacer
                             authorDataNew = authorDataNew.Concat(BitConverter.GetBytes(now)).ToArray(); // + mod_date
 
                             //записываем новый размер чанка
-                            if (authorDataNew != null)
+                            if (authorDataNew != authorDataOld)
                             {
-                                long chunkEnd = fileStream.Position;
                                 writer.Seek(Convert.ToInt32(authorChunkStart - 4), SeekOrigin.Begin);
                                 writer.Write(authorDataNew.Length);
                                 Console.WriteLine("new surface chunk size " + authorDataNew.Length + " old " + authorDataOld.Length);
-                                fileStream.Position = chunkEnd;
-                                Console.WriteLine(fileStream.Position.ToString());
                             }
                             break;
                         default:
@@ -534,71 +480,6 @@ namespace ObjectSurfaceReplacer
 
 
                     Console.WriteLine("update main chunk size {0} old {1}", BitConverter.ToInt64(mainChunkNewSize, 0), mainChunkSize);
-                }
-            }
-        }
-
-        private void findChunkInChunk(string filePath)
-        {
-            using (FileStream fileStream = new FileStream(filePath, FileMode.Open))
-            {
-                BinaryReader reader = new BinaryReader(fileStream);
-
-                // Read the main chunk header
-                int chunkId = reader.ReadInt32();
-                int chunkSize = reader.ReadInt32();
-                int subChunkId;
-                int subChunkSize;
-
-                while (chunkSize > 0)
-                {
-                    // Read the sub-chunk header
-                    subChunkId = reader.ReadInt32();
-                    subChunkSize = reader.ReadInt32();
-
-                    switch (subChunkId)
-                    {
-                        case 0x0101: // A sub-chunk of type 0x1000
-                                     // Read the data for this sub-chunk
-                            byte[] data = reader.ReadBytes(subChunkSize);
-                            Console.WriteLine("Sub-chunk of type 0x0101 found, length: {0}", subChunkSize);
-                            break;
-                        case (int)Object.EOBJ_CHUNK_REVISION:
-                            byte[] creator = reader.ReadBytes(ByteCount(reader));
-                            Console.WriteLine(Encoding.ASCII.GetString(creator)); //Создатель
-                            reader.BaseStream.Position = reader.BaseStream.Position + 1;
-
-                            uint create_date = reader.ReadUInt32();
-
-                            DateTime dateTime = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
-                            dateTime = dateTime.AddSeconds(create_date).ToLocalTime();
-                            Console.WriteLine(dateTime); //дата создания
-
-                            byte[] mod = reader.ReadBytes(ByteCount(reader));
-                            Console.WriteLine(Encoding.ASCII.GetString(mod)); //Мод
-                            reader.BaseStream.Position = reader.BaseStream.Position + 1;
-
-                            uint mod_date = reader.ReadUInt32();
-
-                            dateTime = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
-                            dateTime = dateTime.AddSeconds(mod_date).ToLocalTime();
-                            Console.WriteLine(dateTime); //дата мода
-
-                            /*  authorDataOld = creator;
-                              Array.Resize(ref authorDataOld, authorDataOld.Length + 1);
-                              authorDataOld = authorDataOld.Concat(BitConverter.GetBytes(create_date)).ToArray(); // + create_date
-                              authorDataOld = authorDataOld.Concat(mod).ToArray(); // + mod
-                              Array.Resize(ref authorDataOld, authorDataOld.Length + 1);
-                              authorDataOld = authorDataOld.Concat(BitConverter.GetBytes(mod_date)).ToArray(); // + mod_date*/
-                            break;
-                        default:
-                            // Skip over any unknown sub-chunks
-                            reader.BaseStream.Seek(subChunkSize, SeekOrigin.Current);
-                            break;
-                    }
-
-                    // Update the chunk size to account for the sub-chunk that was just read
-                    chunkSize -= (subChunkSize + 8);
                 }
             }
         }
