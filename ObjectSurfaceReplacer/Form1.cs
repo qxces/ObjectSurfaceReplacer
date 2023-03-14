@@ -150,13 +150,13 @@ namespace ObjectSurfaceReplacer
 
         public static byte[] ReplaceBytes(byte[] src, byte[] search, byte[] repl)
         {
-            StackFrame frame = new StackTrace(1, true).GetFrame(0);
+           /* StackFrame frame = new StackTrace(1, true).GetFrame(0);
 
             // Получаем номер строки и имя файла
             int lineNumber = frame.GetFileLineNumber();
             string fileName = frame.GetFileName();
 
-            Console.WriteLine("Method called from {0}, line {1}", fileName, lineNumber);
+            Console.WriteLine("Method called from {0}, line {1}", fileName, lineNumber);*/
 
             if (repl == null) return src;
             int index = FindBytes(src, search);
@@ -274,8 +274,6 @@ namespace ObjectSurfaceReplacer
 
         private void Reader(string filePath)
         {
-            var file = File.ReadAllBytes(filePath);
-
             using (FileStream fileStream = new FileStream(filePath, FileMode.Open))
             {
                 BinaryReader reader = new BinaryReader(fileStream);
@@ -290,13 +288,13 @@ namespace ObjectSurfaceReplacer
                 byte[] surfacesDataOld = null;
                 byte[] surfacesDataNew = null;
                 long surfacesChunkStart = 0;
+                byte[] authorDataOld = null;
+                byte[] authorDataNew = null;
+                long authorChunkStart = 0;
 
                 BinaryWriter writer = new BinaryWriter(fileStream);
-
-                int subChunkNum = 0;
                 while (chunkSize > 0)
                 {
-                    subChunkNum++;
                     // Read the sub-chunk header
                     subChunkId = reader.ReadInt32();
                     subChunkSize = reader.ReadInt32();
@@ -360,7 +358,6 @@ namespace ObjectSurfaceReplacer
                                 surfacesDataOld = surfacesDataOld.Concat(m_path).ToArray();
                                 Array.Resize(ref surfacesDataOld, surfacesDataOld.Length + 1);
                                 surfacesDataOld = surfacesDataOld.Concat(m_texture).ToArray();
-                                //Array.Resize(ref surfacesDataOld, surfacesDataOld.Length + 1);
                                 surfacesDataOld = surfacesDataOld.Concat(BitConverter.GetBytes(m_flags)).ToArray();
                                 Array.Resize(ref surfacesDataOld, surfacesDataOld.Length + 1);
                                 surfacesDataOld = surfacesDataOld.Concat(m_unk).ToArray();
@@ -375,13 +372,11 @@ namespace ObjectSurfaceReplacer
                                         surfacesDataNew = BitConverter.GetBytes(mat_count);
                                         Console.WriteLine("create new surface data " + mat_count);
                                     }
-                                    //TEST
 
                                     byte[] fix_flags = { 0x0, 0x0, 0x0, 0x0 };
                                     Console.WriteLine("m_flags " + m_flags);
                                     if (m_flags == 1)
                                         fix_flags[1] = 0x1;
-                                   // fix_flags = { 0x0, 0x1, 0x0, 0x0 };
 
                                     //далее пишем список материалов
                                     surfacesDataNew = surfacesDataNew.Concat(mat).ToArray();
@@ -395,9 +390,6 @@ namespace ObjectSurfaceReplacer
                                     surfacesDataNew = surfacesDataNew.Concat(m_path).ToArray();
                                     Array.Resize(ref surfacesDataNew, surfacesDataNew.Length + 1);
                                     surfacesDataNew = surfacesDataNew.Concat(m_texture).ToArray();
-
-                                    //Array.Resize(ref surfacesDataNew, surfacesDataNew.Length + 1);
-                                   // surfacesDataNew = surfacesDataNew.Concat(BitConverter.GetBytes(m_flags)).ToArray();
                                     surfacesDataNew = surfacesDataNew.Concat(fix_flags).ToArray();
                                     Array.Resize(ref surfacesDataNew, surfacesDataNew.Length + 1);
                                     surfacesDataNew = surfacesDataNew.Concat(m_unk).ToArray();
@@ -405,7 +397,7 @@ namespace ObjectSurfaceReplacer
 
                                 if (mats == null)
                                 {
-                                   newData();
+                                    newData();
                                     continue;
                                 }
                                 Console.WriteLine(@"m_engine '{0}' m_compiler '{1}' m_game '{2}' two sided '{3}'", mats[0], mats[1], mats[2], mats[3]);
@@ -433,11 +425,11 @@ namespace ObjectSurfaceReplacer
                                 }
 
 
-                               newData();
+                                newData();
                             }
 
-                            Console.WriteLine(("new surface data " + Encoding.ASCII.GetString(surfacesDataNew)));
-                            Console.WriteLine(("old surface data " + Encoding.ASCII.GetString(surfacesDataOld)));
+                           /* Console.WriteLine(("new surface data " + Encoding.ASCII.GetString(surfacesDataNew)));
+                            Console.WriteLine(("old surface data " + Encoding.ASCII.GetString(surfacesDataOld)));*/
 
 
                             //записываем новый размер чанка
@@ -447,6 +439,59 @@ namespace ObjectSurfaceReplacer
                                 writer.Seek(Convert.ToInt32(surfacesChunkStart - 4), SeekOrigin.Begin);
                                 writer.Write(surfacesDataNew.Length);
                                 Console.WriteLine("new surface chunk size " + surfacesDataNew.Length + " old " + surfacesDataOld.Length);
+                                fileStream.Position = chunkEnd;
+                                Console.WriteLine(fileStream.Position.ToString());
+                            }
+                            break;
+                        case (int)Object.EOBJ_CHUNK_REVISION:
+
+                            // Seek to the start of the chunk data
+                            authorChunkStart = fileStream.Position;
+
+                            byte[] creator = reader.ReadBytes(ByteCount(reader));
+                            Console.WriteLine(Encoding.ASCII.GetString(creator)); //Создатель
+                            reader.BaseStream.Position = reader.BaseStream.Position + 1;
+
+                            uint create_date = reader.ReadUInt32();
+
+                            DateTime dateTime = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
+                            dateTime = dateTime.AddSeconds(create_date).ToLocalTime();
+                            Console.WriteLine(dateTime); //дата создания
+
+                            byte[] mod = reader.ReadBytes(ByteCount(reader));
+                            Console.WriteLine(Encoding.ASCII.GetString(mod)); //Мод
+                            reader.BaseStream.Position = reader.BaseStream.Position + 1;
+
+                            uint mod_date = reader.ReadUInt32();
+
+                            dateTime = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
+                            dateTime = dateTime.AddSeconds(mod_date).ToLocalTime();
+                            Console.WriteLine(dateTime); //дата мода
+
+                            authorDataOld = creator;
+                            Array.Resize(ref authorDataOld, authorDataOld.Length + 1);
+                            authorDataOld = authorDataOld.Concat(BitConverter.GetBytes(create_date)).ToArray(); // + create_date
+                            authorDataOld = authorDataOld.Concat(mod).ToArray(); // + mod
+                            Array.Resize(ref authorDataOld, authorDataOld.Length + 1);
+                            authorDataOld = authorDataOld.Concat(BitConverter.GetBytes(mod_date)).ToArray(); // + mod_date
+
+                            uint now = Convert.ToUInt32(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                            Console.WriteLine(now);
+
+                            authorDataNew = creator;
+                            Array.Resize(ref authorDataNew, authorDataNew.Length + 1);
+                            authorDataNew = authorDataNew.Concat(BitConverter.GetBytes(create_date)).ToArray(); // + create_date
+                            authorDataNew = authorDataNew.Concat(Encoding.ASCII.GetBytes("yoba")).ToArray(); // + mod
+                            Array.Resize(ref authorDataNew, authorDataNew.Length + 1);
+                            authorDataNew = authorDataNew.Concat(BitConverter.GetBytes(now)).ToArray(); // + mod_date
+
+                            //записываем новый размер чанка
+                            if (authorDataNew != null)
+                            {
+                                long chunkEnd = fileStream.Position;
+                                writer.Seek(Convert.ToInt32(authorChunkStart - 4), SeekOrigin.Begin);
+                                writer.Write(authorDataNew.Length);
+                                Console.WriteLine("new surface chunk size " + authorDataNew.Length + " old " + authorDataOld.Length);
                                 fileStream.Position = chunkEnd;
                                 Console.WriteLine(fileStream.Position.ToString());
                             }
@@ -461,12 +506,20 @@ namespace ObjectSurfaceReplacer
                     chunkSize -= (subChunkSize + 8);
                 }
 
-                Console.WriteLine("sub chunks " + subChunkNum);
                 reader.Close();
                 writer.Close();
 
                 byte[] buffer = File.ReadAllBytes(filePath);
                 byte[] res = ReplaceBytes(buffer, surfacesDataOld, surfacesDataNew);
+                if (buffer != res)
+                {
+                    /* Console.WriteLine("old surface data: " + BitConverter.ToString(surfacesDataOld, 0, surfacesDataOld.Length));
+                     Console.WriteLine("new surface data: " + BitConverter.ToString(surfacesDataNew, 0, surfacesDataNew.Length));*/
+                    File.WriteAllBytes(filePath, res);
+
+                }
+                buffer = File.ReadAllBytes(filePath);
+                res = ReplaceBytes(buffer, authorDataOld, authorDataNew);
                 if (buffer != res)
                 {
                     /* Console.WriteLine("old surface data: " + BitConverter.ToString(surfacesDataOld, 0, surfacesDataOld.Length));
