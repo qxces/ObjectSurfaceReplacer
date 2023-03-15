@@ -189,23 +189,22 @@ namespace ObjectSurfaceReplacer
             return -1;
         }
 
+        // Calculate the number of bytes left in the material path.
         private int ByteCount(BinaryReader reader)
         {
-            //узнаем сколько байтов строка
-            var b_count = 0;
-            while (true)
+            long position = reader.BaseStream.Position;
+            byte current = reader.ReadByte();
+            int byteCount = 0;
+            while (current != 0x0)
             {
-                if (reader.ReadByte() != 0)
-                    b_count++;
-                else
-                    break;
+                byteCount++;
+                current = reader.ReadByte();
             }
-            //возвращаем позицию на ту откуда начали
-            reader.BaseStream.Position = reader.BaseStream.Position - b_count - 1;
-            return b_count;
+            reader.BaseStream.Position = position;
+            return byteCount;
         }
 
-        private void test_btn_Click(object sender, EventArgs e)
+        private void Replace_btn_Click(object sender, EventArgs e)
         {
             string filePath = @"E:\X-Ray_CoP_SDK\editors\import\trees_palki1.~object";
 
@@ -320,7 +319,6 @@ namespace ObjectSurfaceReplacer
                                     }
 
                                     byte[] fix_flags = { 0x0, 0x0, 0x0, 0x0 };
-                                    Console.WriteLine("m_flags " + m_flags);
                                     if (m_flags == 1)
                                         fix_flags[1] = 0x1;
 
@@ -439,7 +437,7 @@ namespace ObjectSurfaceReplacer
                             {
                                 writer.Seek(Convert.ToInt32(authorChunkStart - 4), SeekOrigin.Begin);
                                 writer.Write(authorDataNew.Length);
-                                Console.WriteLine("new surface chunk size " + authorDataNew.Length + " old " + authorDataOld.Length);
+                                Console.WriteLine("new surface author size " + authorDataNew.Length + " old " + authorDataOld.Length);
                             }
                             break;
                         default:
