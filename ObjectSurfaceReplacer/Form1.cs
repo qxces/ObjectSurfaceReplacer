@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -147,7 +148,7 @@ namespace ObjectSurfaceReplacer
                 return all;
             }
             //else
-            //Console.WriteLine(@"material for '{0}' not found", texture);
+            //WriteLine(@"material for '{0}' not found", texture);
             return null;
         }
 
@@ -159,7 +160,7 @@ namespace ObjectSurfaceReplacer
              int lineNumber = frame.GetFileLineNumber();
              string fileName = frame.GetFileName();
 
-             Console.WriteLine("Method called from {0}, line {1}", fileName, lineNumber);*/
+             WriteLine("Method called from {0}, line {1}", fileName, lineNumber);*/
 
             if (repl == null) return src;
             int index = FindBytes(src, search);
@@ -227,7 +228,7 @@ namespace ObjectSurfaceReplacer
                 int chunkId = reader.ReadInt32();
                 int chunkSize = reader.ReadInt32();
                 int mainChunkSize = chunkSize;
-                Console.WriteLine($"header id {chunkId} size {chunkSize}");
+                WriteLine($"header id {chunkId} size {chunkSize}");
                 int subChunkId;
                 int subChunkSize;
                 byte[] surfacesDataOld = null;
@@ -244,6 +245,7 @@ namespace ObjectSurfaceReplacer
                     subChunkId = reader.ReadInt32();
                     subChunkSize = reader.ReadInt32();
 
+                    WriteLine("chunk: " + subChunkId.ToString("X"));
                     switch (subChunkId)
                     {
                         case (int)Object.EOBJ_CHUNK_SURFACES_2:
@@ -252,45 +254,45 @@ namespace ObjectSurfaceReplacer
                             surfacesChunkStart = fileStream.Position;
 
                             int mat_count = reader.ReadInt32();
-                            Console.WriteLine("mat count " + mat_count);
+                            WriteLine("mat count " + mat_count);
 
                             // Loop through each sub-chunk
                             for (int i = 0; i < mat_count; i++)
                             {
-                                Console.WriteLine("mat #" + i);
+                                WriteLine("mat #" + i);
                                 var mat = reader.ReadBytes(ByteCount(reader));
-                                Console.WriteLine(Encoding.ASCII.GetString(mat)); //Материал
+                                WriteLine(Encoding.ASCII.GetString(mat)); //Материал
                                 reader.BaseStream.Position = reader.BaseStream.Position + 1;
 
                                 var m_engine = reader.ReadBytes(ByteCount(reader));
-                                Console.WriteLine(Encoding.ASCII.GetString(m_engine)); //движковый
+                                WriteLine(Encoding.ASCII.GetString(m_engine)); //движковый
                                 reader.BaseStream.Position = reader.BaseStream.Position + 1;
 
                                 var m_compiler = reader.ReadBytes(ByteCount(reader));
-                                Console.WriteLine(Encoding.ASCII.GetString(m_compiler)); //компилятор
+                                WriteLine(Encoding.ASCII.GetString(m_compiler)); //компилятор
                                 reader.BaseStream.Position = reader.BaseStream.Position + 1;
 
                                 var m_game = reader.ReadBytes(ByteCount(reader));
-                                Console.WriteLine(Encoding.ASCII.GetString(m_game)); //игра
+                                WriteLine(Encoding.ASCII.GetString(m_game)); //игра
                                 reader.BaseStream.Position = reader.BaseStream.Position + 1;
 
                                 var m_path = reader.ReadBytes(ByteCount(reader));
-                                Console.WriteLine(Encoding.ASCII.GetString(m_path)); //путь
+                                WriteLine(Encoding.ASCII.GetString(m_path)); //путь
                                 reader.BaseStream.Position = reader.BaseStream.Position + 1;
 
                                 var m_texture = reader.ReadBytes(ByteCount(reader));
-                                Console.WriteLine(Encoding.ASCII.GetString(m_texture)); //текстура
+                                WriteLine(Encoding.ASCII.GetString(m_texture)); //текстура
                                 reader.BaseStream.Position = reader.BaseStream.Position + 1;
 
                                 uint m_flags = reader.ReadUInt32();
-                                Console.WriteLine("m_flags " + m_flags); //флаги 0x1, если материал двусторонний, иначе 0x0
+                                WriteLine("m_flags " + m_flags); //флаги 0x1, если материал двусторонний, иначе 0x0
                                 byte[] m_unk = reader.ReadBytes(8); //0x12 0x1 0x0 0x0 0x1 0x0 0x0 0x0	
 
 
                                 if (surfacesDataOld == null)
                                 {
                                     surfacesDataOld = BitConverter.GetBytes(mat_count);
-                                    Console.WriteLine("create old surface data");
+                                    WriteLine("create old surface data");
                                 }
                                 surfacesDataOld = surfacesDataOld.Concat(mat).ToArray();
                                 Array.Resize(ref surfacesDataOld, surfacesDataOld.Length + 1);
@@ -308,6 +310,20 @@ namespace ObjectSurfaceReplacer
                                 surfacesDataOld = surfacesDataOld.Concat(m_unk).ToArray();
 
                                 string[] mats = searchTextureMaterial(Encoding.ASCII.GetString(m_path));
+                                string matString = Encoding.ASCII.GetString(mat);
+
+                                //для дерева юзаем отдельные предопределенные параметры
+                                string[] fakeStrings = { "bark_fake", "fake_bark" };
+                                if (fakeStrings.Any(s => matString.Contains(s)))
+                                {
+                                    mats = new string[] { @"def_shaders\def_trans", @"flora\flora_collision", @"materials\tree_trunk", "0" };
+                                }
+                                fakeStrings = new string[] { "fake_kust", "kust_fake", "fake_bush", "bush_fake", "leaf_fake", "fake_leaf" };
+                                if (fakeStrings.Any(s => matString.Contains(s)))
+                                {
+                                    mats = new string[] { @"def_shaders\def_trans", @"flora\flora_collision", @"materials\bush", "0" };
+                                }
+
 
                                 void newData()
                                 {
@@ -315,7 +331,7 @@ namespace ObjectSurfaceReplacer
                                     {
                                         //если не было данных добавляем сначала кол-во материалов, потом материалы
                                         surfacesDataNew = BitConverter.GetBytes(mat_count);
-                                        Console.WriteLine("create new surface data " + mat_count);
+                                        WriteLine("create new surface data " + mat_count);
                                     }
 
                                     byte[] fix_flags = { 0x0, 0x0, 0x0, 0x0 };
@@ -350,36 +366,36 @@ namespace ObjectSurfaceReplacer
                                         continue;
                                     }
                                 }
-                                Console.WriteLine(@"m_engine '{0}' m_compiler '{1}' m_game '{2}' two sided '{3}'", mats[0], mats[1], mats[2], mats[3]);
-                                Console.WriteLine("mats :" + mats.Length);
+                                //   WriteLine(@"m_engine '{0}' m_compiler '{1}' m_game '{2}' two sided '{3}'", mats[0], mats[1], mats[2], mats[3]);
                                 if (mats[0] != null && mats[0].Length > 0)
                                 {
-                                    Console.WriteLine("TODO: меняем движковый шейдер на {0}", mats[0]);
+                                    WriteLine("меняем движковый шейдер на {0}", mats[0]);
                                     m_engine = Encoding.ASCII.GetBytes(mats[0]);
                                 }
                                 if (mats[1] != null && mats[1].Length > 0)
                                 {
-                                    Console.WriteLine("TODO: меняем шейдер компилятора на {0}", mats[1]);
+                                    WriteLine("меняем шейдер компилятора на {0}", mats[1]);
                                     m_compiler = Encoding.ASCII.GetBytes(mats[1]);
                                 }
                                 if (mats[2] != null && mats[2].Length > 0)
                                 {
-                                    Console.WriteLine("TODO: меняем шейдер игры на {0}", mats[2]);
+                                    WriteLine("меняем шейдер игры на {0}", mats[2]);
                                     m_game = Encoding.ASCII.GetBytes(mats[2]);
                                 }
                                 if (mats[3] != null && mats[3].Length > 0)
                                 {
-                                    Console.WriteLine("TODO: меняем тип материала на двухсторонний {0}", mats[3]);
+                                    WriteLine("меняем тип материала на двухсторонний {0}", mats[3]);
                                     if (int.TryParse(mats[3], out int num))
                                         m_flags = Convert.ToUInt32(num);
                                 }
 
 
                                 newData();
+                                authorChunkStart = writer.BaseStream.Position;
                             }
 
-                            /* Console.WriteLine(("new surface data " + Encoding.ASCII.GetString(surfacesDataNew)));
-                             Console.WriteLine(("old surface data " + Encoding.ASCII.GetString(surfacesDataOld)));*/
+                            /*  WriteLine(("new surface data " + Encoding.ASCII.GetString(surfacesDataNew)));
+                              WriteLine(("old surface data " + Encoding.ASCII.GetString(surfacesDataOld)));*/
 
 
                             //записываем новый размер чанка
@@ -387,33 +403,34 @@ namespace ObjectSurfaceReplacer
                             {
                                 writer.Seek(Convert.ToInt32(surfacesChunkStart - 4), SeekOrigin.Begin);
                                 writer.Write(surfacesDataNew.Length);
-                                Console.WriteLine("new surface chunk size " + surfacesDataNew.Length + " old " + surfacesDataOld.Length);
+                                WriteLine("new surface chunk size " + surfacesDataNew.Length + " old " + surfacesDataOld.Length);
                             }
                             break;
+                        //БАГ: не может найти чанк потому что ищет по 8 байтов (ID чанка + размер), но файл не делится ровно на 4 байта
                         case (int)Object.EOBJ_CHUNK_REVISION:
 
                             // Seek to the start of the chunk data
                             authorChunkStart = fileStream.Position;
 
                             byte[] creator = reader.ReadBytes(ByteCount(reader));
-                            Console.WriteLine(Encoding.ASCII.GetString(creator)); //Создатель
+                            WriteLine(Encoding.ASCII.GetString(creator)); //Создатель
                             reader.BaseStream.Position = reader.BaseStream.Position + 1;
 
                             uint create_date = reader.ReadUInt32();
 
                             DateTime dateTime = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
                             dateTime = dateTime.AddSeconds(create_date).ToLocalTime();
-                            Console.WriteLine(dateTime); //дата создания
+                            WriteLine(dateTime); //дата создания
 
                             byte[] mod = reader.ReadBytes(ByteCount(reader));
-                            Console.WriteLine(Encoding.ASCII.GetString(mod)); //Мод
+                            WriteLine(Encoding.ASCII.GetString(mod)); //Мод
                             reader.BaseStream.Position = reader.BaseStream.Position + 1;
 
                             uint mod_date = reader.ReadUInt32();
 
                             dateTime = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
                             dateTime = dateTime.AddSeconds(mod_date).ToLocalTime();
-                            Console.WriteLine(dateTime); //дата мода
+                            WriteLine(dateTime); //дата мода
 
                             authorDataOld = creator;
                             Array.Resize(ref authorDataOld, authorDataOld.Length + 1);
@@ -423,7 +440,7 @@ namespace ObjectSurfaceReplacer
                             authorDataOld = authorDataOld.Concat(BitConverter.GetBytes(mod_date)).ToArray(); // + mod_date
 
                             uint now = Convert.ToUInt32(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
-                            Console.WriteLine(now);
+                            WriteLine(now);
 
                             authorDataNew = creator;
                             Array.Resize(ref authorDataNew, authorDataNew.Length + 1);
@@ -437,7 +454,7 @@ namespace ObjectSurfaceReplacer
                             {
                                 writer.Seek(Convert.ToInt32(authorChunkStart - 4), SeekOrigin.Begin);
                                 writer.Write(authorDataNew.Length);
-                                Console.WriteLine("new surface author size " + authorDataNew.Length + " old " + authorDataOld.Length);
+                                WriteLine("new surface author size " + authorDataNew.Length + " old " + authorDataOld.Length);
                             }
                             break;
                         default:
@@ -450,6 +467,11 @@ namespace ObjectSurfaceReplacer
                     chunkSize -= (subChunkSize + 8);
                 }
 
+              /*  List<byte[]> data = new List<byte[]> { };
+                data = replaceAuthor(fileStream, authorChunkStart, reader, writer);
+                authorDataOld = data[0];
+                authorDataNew = data[1];*/
+
                 reader.Close();
                 writer.Close();
 
@@ -457,19 +479,20 @@ namespace ObjectSurfaceReplacer
                 byte[] res = ReplaceBytes(buffer, surfacesDataOld, surfacesDataNew);
                 if (buffer != res)
                 {
-                    /* Console.WriteLine("old surface data: " + BitConverter.ToString(surfacesDataOld, 0, surfacesDataOld.Length));
-                     Console.WriteLine("new surface data: " + BitConverter.ToString(surfacesDataNew, 0, surfacesDataNew.Length));*/
+                    /* WriteLine("old surface data: " + BitConverter.ToString(surfacesDataOld, 0, surfacesDataOld.Length));
+                     WriteLine("new surface data: " + BitConverter.ToString(surfacesDataNew, 0, surfacesDataNew.Length));*/
                     File.WriteAllBytes(filePath, res);
 
                 }
-                buffer = File.ReadAllBytes(filePath);
+              /*  buffer = File.ReadAllBytes(filePath);
                 res = ReplaceBytes(buffer, authorDataOld, authorDataNew);
+                WriteLine("old author data: " + BitConverter.ToString(authorDataOld, 0, authorDataOld.Length));
                 if (buffer != res)
                 {
-                    /* Console.WriteLine("old surface data: " + BitConverter.ToString(surfacesDataOld, 0, surfacesDataOld.Length));
-                     Console.WriteLine("new surface data: " + BitConverter.ToString(surfacesDataNew, 0, surfacesDataNew.Length));*/
+
+                    WriteLine("new author data: " + BitConverter.ToString(authorDataNew, 0, authorDataNew.Length));
                     File.WriteAllBytes(filePath, res);
-                }
+                }*/
                 using (FileStream fs = new FileStream(filePath, FileMode.Open, FileAccess.ReadWrite))
                 {
                     byte[] mainChunkNewSize = BitConverter.GetBytes(fs.Length - 8); // bytes to replace with
@@ -477,9 +500,85 @@ namespace ObjectSurfaceReplacer
                     fs.Write(mainChunkNewSize, 0, 4); // write the new bytes
 
 
-                    Console.WriteLine("update main chunk size {0} old {1}", BitConverter.ToInt64(mainChunkNewSize, 0), mainChunkSize);
+                    WriteLine("update main chunk size {0} old {1}", BitConverter.ToInt64(mainChunkNewSize, 0), mainChunkSize);
                 }
             }
+        }
+
+        private List<byte[]> replaceAuthor(FileStream fileStream, long pos, BinaryReader reader, BinaryWriter writer)
+        {
+            //  throw new ArgumentException((pos).ToString());
+            byte[] authorDataOld;
+            // Seek to the start of the chunk data
+            fileStream.Position = pos + 8;
+
+            byte[] creator = reader.ReadBytes(ByteCount(reader));
+            WriteLine(Encoding.ASCII.GetString(creator)); //Создатель
+            reader.BaseStream.Position = reader.BaseStream.Position + 1;
+
+            uint create_date = reader.ReadUInt32();
+
+            DateTime dateTime = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
+            dateTime = dateTime.AddSeconds(create_date).ToLocalTime();
+            WriteLine(dateTime); //дата создания
+
+            byte[] mod = reader.ReadBytes(ByteCount(reader));
+            WriteLine(Encoding.ASCII.GetString(mod)); //Мод
+            reader.BaseStream.Position = reader.BaseStream.Position + 1;
+
+            uint mod_date = reader.ReadUInt32();
+
+            dateTime = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
+            dateTime = dateTime.AddSeconds(mod_date).ToLocalTime();
+            WriteLine(dateTime); //дата мода
+
+            authorDataOld = creator;
+            Array.Resize(ref authorDataOld, authorDataOld.Length + 1);
+            authorDataOld = authorDataOld.Concat(BitConverter.GetBytes(create_date)).ToArray(); // + create_date
+            authorDataOld = authorDataOld.Concat(mod).ToArray(); // + mod
+            Array.Resize(ref authorDataOld, authorDataOld.Length + 1);
+            authorDataOld = authorDataOld.Concat(BitConverter.GetBytes(mod_date)).ToArray(); // + mod_date
+
+            uint now = Convert.ToUInt32(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+            WriteLine(now);
+
+            byte[] authorDataNew = creator;
+            Array.Resize(ref authorDataNew, authorDataNew.Length + 1);
+            authorDataNew = authorDataNew.Concat(BitConverter.GetBytes(create_date)).ToArray(); // + create_date
+            authorDataNew = authorDataNew.Concat(Encoding.ASCII.GetBytes("yoba")).ToArray(); // + mod
+            Array.Resize(ref authorDataNew, authorDataNew.Length + 1);
+            authorDataNew = authorDataNew.Concat(BitConverter.GetBytes(now)).ToArray(); // + mod_date
+
+            //записываем новый размер чанка
+
+            writer.Seek(Convert.ToInt32(pos + 4), SeekOrigin.Begin);
+            writer.Write(authorDataNew.Length);
+            List<byte[]> data = new List<byte[]> { };
+            data.Add(authorDataOld);
+            data.Add(authorDataNew);
+            return data;
+        }
+
+        private void WriteLine(dynamic line, params object[] args)
+        {
+            string message;
+            if (args.Length == 0)
+            {
+                Console.WriteLine(line);
+                message = string.Format(line.ToString());
+            }
+            else
+            {
+                Console.WriteLine(line, args);
+                message = string.Format(line, args);
+            }
+            richTextBox1.AppendText(message + "\n");
+        }
+
+        private void richTextBox1_TextChanged(object sender, EventArgs e)
+        {
+            // Scroll to the end of the text
+            richTextBox1.ScrollToCaret();
         }
     }
 }
